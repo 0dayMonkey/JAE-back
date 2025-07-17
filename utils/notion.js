@@ -1,6 +1,6 @@
 const { Client } = require('@notionhq/client');
-
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
+
 const DB_EQUIPES = process.env.NOTION_DB_EQUIPES;
 const DB_STANDS = process.env.NOTION_DB_STANDS;
 const DB_LOGS = process.env.NOTION_DB_LOGS;
@@ -26,7 +26,6 @@ const getStandsList = async () => {
         name: page.properties['Nom du Stand'].title[0].text.content
     }));
 };
-
 
 // Trouve un stand par son nom pour l'authentification
 const findStandByName = async (name) => {
@@ -69,27 +68,33 @@ const addScore = async (teamId, standId, points) => {
     });
 };
 
-// Récupère tous les logs de scores
+// Récupère tous les logs de scores (VERSION AMÉLIORÉE)
 const getScoreLogs = async () => {
+    // Étape 1: Récupérer toutes les équipes et tous les stands pour créer des tables de correspondance
+    const [teams, stands] = await Promise.all([getTeams(), getStandsList()]);
+    const teamMap = new Map(teams.map(t => [t.id, t.name]));
+    const standMap = new Map(stands.map(s => [s.id, s.name]));
+
+    // Étape 2: Récupérer tous les logs
     const response = await notion.databases.query({
         database_id: DB_LOGS,
         sorts: [{ property: 'Timestamp', direction: 'descending' }]
     });
 
-    // C'est un peu complexe car il faut "résoudre" les relations
-    const logs = response.results.map(page => {
+    // Étape 3: "Résoudre" les relations en utilisant les maps
+    return response.results.map(page => {
+        const teamRelation = page.properties['Relation Equipe'].relation[0];
+        const standRelation = page.properties['Relation Stand'].relation[0];
+
         return {
             id: page.id,
             points: page.properties.Points.number,
             timestamp: page.properties.Timestamp.created_time,
-            // On stocke les IDs des relations pour les récupérer plus tard si besoin
-            teamId: page.properties['Relation Equipe'].relation[0]?.id,
-            standId: page.properties['Relation Stand'].relation[0]?.id
+            teamName: teamRelation ? teamMap.get(teamRelation.id) : 'N/A',
+            standName: standRelation ? standMap.get(standRelation.id) : 'N/A'
         };
     });
-    return logs;
 };
-
 
 module.exports = {
     getTeams,
