@@ -22,31 +22,16 @@ jobs:
       - name: Déploiement sur le VPS
         uses: appleboy/ssh-action@master
         with:
-          # Informations de connexion via les Secrets de GitHub
+          # Informations de connexion
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }} # <-- On utilise le mot de passe
           port: ${{ secrets.VPS_PORT || 22 }}
 
-          # Script à exécuter sur le serveur
+          # Le script reste identique
           script: |
-            # Se déplace dans le répertoire du projet sur le VPS
             cd /var/www/JAE-back
-
-            # Affiche la date pour les logs
-            echo "--- Déploiement du $(date) ---"
-
-            # Récupère la dernière version du dépôt
             git fetch origin main
-
-            # Réinitialise la branche locale pour qu'elle corresponde exactement au dépôt distant
-            # Ceci évite les conflits et écrase les modifications locales sur le serveur
             git reset --hard origin/main
-
-            # Installe les dépendances de production uniquement (plus rapide et plus sûr)
             npm install --omit=dev
-
-            # Recharge l'application avec PM2 sans temps d'arrêt
             pm2 reload JAE-back
-            
-            echo "--- Déploiement terminé avec succès ---"
