@@ -1,0 +1,52 @@
+# Nom du workflow qui apparaîtra dans l'onglet "Actions" de GitHub
+name: Déploiement sur VPS
+
+# Déclencheur du workflow
+on:
+  push:
+    branches:
+      - main  # Se déclenche uniquement sur les push vers la branche main
+
+# Tâches à exécuter
+jobs:
+  deploy:
+    # Utilise la dernière version d'Ubuntu disponible sur GitHub Actions
+    runs-on: ubuntu-latest
+
+    steps:
+      # Étape 1: Récupère le code source de votre dépôt
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      # Étape 2: Se connecte au VPS et exécute le script de déploiement
+      - name: Déploiement sur le VPS
+        uses: appleboy/ssh-action@master
+        with:
+          # Informations de connexion via les Secrets de GitHub
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+
+          # Script à exécuter sur le serveur
+          script: |
+            # Se déplace dans le répertoire du projet sur le VPS
+            cd /var/www/JAE-back
+
+            # Affiche la date pour les logs
+            echo "--- Déploiement du $(date) ---"
+
+            # Récupère la dernière version du dépôt
+            git fetch origin main
+
+            # Réinitialise la branche locale pour qu'elle corresponde exactement au dépôt distant
+            # Ceci évite les conflits et écrase les modifications locales sur le serveur
+            git reset --hard origin/main
+
+            # Installe les dépendances de production uniquement (plus rapide et plus sûr)
+            npm install --omit=dev
+
+            # Recharge l'application avec PM2 sans temps d'arrêt
+            pm2 reload JAE-back
+            
+            echo "--- Déploiement terminé avec succès ---"
