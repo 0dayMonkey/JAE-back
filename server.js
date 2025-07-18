@@ -165,10 +165,10 @@ app.post('/api/admin/teams/:teamId/adjust', authenticateToken, async (req, res) 
 });
 
 
-app.put('/api/admin/stands/:standId/toggle', authenticateToken, async (req, res) => {
+app.put('/api/admin/stands/:standId/status', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     try {
-        await notionUtils.toggleStandActive(req.params.standId, req.body.isActive);
+        await notionUtils.setStandStatus(req.params.standId, req.body.status);
         res.json({ message: 'Statut du stand mis à jour.' });
     } catch(error) {
         res.status(500).json({ message: 'Erreur mise à jour du statut.' });
