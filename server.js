@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 
 const corsOptions = {
-  origin: process.env.FRONTEND_URL, 
+  origin: process.env.FRONTEND_URL,
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -69,7 +69,7 @@ app.post('/api/auth/stand', async (req, res) => {
 
     } catch (error) {
         console.error("Erreur lors de l'authentification du stand:", error);
-        res.status(500).send("Erreur serveur lors de la vérification du stand. L'API Notion est peut-être indisponible.");
+        res.status(500).send("Erreur serveur lors de la vérification du stand.");
     }
 });
 
@@ -109,6 +109,34 @@ app.get('/api/admin/logs', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/scores/:logId', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    const { logId } = req.params;
+    const { points } = req.body;
+
+    try {
+        await notionUtils.updateScore(logId, points);
+        res.json({ message: 'Score mis à jour avec succès.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Erreur lors de la mise à jour du score.' });
+    }
+});
+
+app.delete('/api/scores/:logId', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+
+    const { logId } = req.params;
+
+    try {
+        await notionUtils.deleteScore(logId);
+        res.json({ message: 'Score supprimé avec succès.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Erreur lors de la suppression du score.' });
+    }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Serveur API démarré sur le port ${PORT}`));
