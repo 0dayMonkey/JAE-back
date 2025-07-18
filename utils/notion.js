@@ -5,7 +5,6 @@ const DB_EQUIPES = process.env.NOTION_DB_EQUIPES;
 const DB_STANDS = process.env.NOTION_DB_STANDS;
 const DB_LOGS = process.env.NOTION_DB_LOGS;
 
-// Récupère les équipes et leurs scores, triées par score
 const getTeams = async () => {
     const response = await notion.databases.query({
         database_id: DB_EQUIPES,
@@ -18,7 +17,6 @@ const getTeams = async () => {
     }));
 };
 
-// Récupère la liste simple des stands
 const getStandsList = async () => {
     const response = await notion.databases.query({ database_id: DB_STANDS });
     return response.results.map(page => ({
@@ -27,39 +25,42 @@ const getStandsList = async () => {
     }));
 };
 
-// Trouve un stand par son nom pour l'authentification
 const findStandByName = async (name) => {
     const response = await notion.databases.query({
         database_id: DB_STANDS,
         filter: { property: 'Nom du Stand', title: { equals: name } }
     });
     if (response.results.length === 0) return null;
+
     const page = response.results[0];
+    const pinProperty = page.properties['PIN Sécurisé'];
+
+    if (!pinProperty || !pinProperty.rich_text || pinProperty.rich_text.length === 0) {
+        console.error(`Le stand "${name}" a été trouvé mais n'a pas de PIN configuré dans Notion.`);
+        return null;
+    }
+
     return {
         id: page.id,
         name: page.properties['Nom du Stand'].title[0].text.content,
-        pinHash: page.properties['PIN Sécurisé'].rich_text[0].text.content
+        pinHash: pinProperty.rich_text[0].text.content
     };
 };
 
-// Ajoute un log de score ET met à jour le total de l'équipe
 const addScore = async (teamId, standId, points) => {
-    // 1. Log l'événement
     await notion.pages.create({
         parent: { database_id: DB_LOGS },
         properties: {
             'ID': { title: [{ text: { content: `${new Date().toISOString()}-${teamId}` } }] },
-            'Points': { number: points },
-            'Relation Stand': { relation: [{ id: standId }] },
-            'Relation Equipe': { relation: [{ id: teamId }] }
+            '# Points': { number: points },
+            'Stands': { relation: [{ id: standId }] },
+            'Equipes': { relation: [{ id: teamId }] }
         }
     });
 
-    // 2. Récupère le score actuel de l'équipe
     const teamPage = await notion.pages.retrieve({ page_id: teamId });
     const currentScore = teamPage.properties['Score Total'].number || 0;
 
-    // 3. Met à jour le score total de l'équipe
     await notion.pages.update({
         page_id: teamId,
         properties: {
@@ -68,27 +69,23 @@ const addScore = async (teamId, standId, points) => {
     });
 };
 
-// Récupère tous les logs de scores (VERSION AMÉLIORÉE)
 const getScoreLogs = async () => {
-    // Étape 1: Récupérer toutes les équipes et tous les stands pour créer des tables de correspondance
     const [teams, stands] = await Promise.all([getTeams(), getStandsList()]);
     const teamMap = new Map(teams.map(t => [t.id, t.name]));
     const standMap = new Map(stands.map(s => [s.id, s.name]));
 
-    // Étape 2: Récupérer tous les logs
     const response = await notion.databases.query({
         database_id: DB_LOGS,
         sorts: [{ property: 'Timestamp', direction: 'descending' }]
     });
 
-    // Étape 3: "Résoudre" les relations en utilisant les maps
     return response.results.map(page => {
-        const teamRelation = page.properties['Relation Equipe'].relation[0];
-        const standRelation = page.properties['Relation Stand'].relation[0];
+        const teamRelation = page.properties['Equipes'].relation[0];
+        const standRelation = page.properties['Stands'].relation[0];
 
         return {
             id: page.id,
-            points: page.properties.Points.number,
+            points: page.properties['# Points'].number,
             timestamp: page.properties.Timestamp.created_time,
             teamName: teamRelation ? teamMap.get(teamRelation.id) : 'N/A',
             standName: standRelation ? standMap.get(standRelation.id) : 'N/A'
