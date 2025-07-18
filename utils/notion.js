@@ -55,7 +55,7 @@ const addScore = async (teamId, standId, points) => {
         parent: { database_id: DB_LOGS },
         properties: {
             'ID': { title: [{ text: { content: `Log-${Date.now()}` } }] },
-            '# Points': { number: points },
+            'Points': { number: points },
             'Stands': { relation: [{ id: standId }] },
             'Equipes': { relation: [{ id: teamId }] }
         }
@@ -81,7 +81,7 @@ const getScoreLogs = async () => {
         const standRelation = page.properties.Stands.relation[0];
         return {
             logId: page.id,
-            points: page.properties['# Points'].number,
+            points: page.properties['Points'].number,
             timestamp: page.properties.Timestamp.created_time,
             teamName: teamRelation ? teamMap.get(teamRelation.id) : 'N/A',
             standName: standRelation ? standMap.get(standRelation.id) : 'N/A'
@@ -91,19 +91,19 @@ const getScoreLogs = async () => {
 
 const updateScore = async (logId, newPoints) => {
     const logPage = await notion.pages.retrieve({ page_id: logId });
-    const oldPoints = logPage.properties['# Points'].number;
+    const oldPoints = logPage.properties['Points'].number;
     const teamId = logPage.properties.Equipes.relation[0].id;
     const pointDifference = newPoints - oldPoints;
     const teamPage = await notion.pages.retrieve({ page_id: teamId });
     const currentTeamScore = teamPage.properties['Score Total'].number || 0;
-    await notion.pages.update({ page_id: logId, properties: { '# Points': { number: newPoints } } });
+    await notion.pages.update({ page_id: logId, properties: { 'Points': { number: newPoints } } });
     await notion.pages.update({ page_id: teamId, properties: { 'Score Total': { number: currentTeamScore + pointDifference } } });
 };
 
 const deleteScore = async (logId) => {
     const logPage = await notion.pages.retrieve({ page_id: logId });
     if (logPage.archived) return;
-    const pointsToDelete = logPage.properties['# Points'].number;
+    const pointsToDelete = logPage.properties['Points'].number;
     const teamId = logPage.properties.Equipes.relation[0].id;
     const teamPage = await notion.pages.retrieve({ page_id: teamId });
     const currentTeamScore = teamPage.properties['Score Total'].number || 0;
