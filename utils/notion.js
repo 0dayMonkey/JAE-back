@@ -53,7 +53,7 @@ const addScore = async (teamId, standId, points) => {
         parent: { database_id: DB_LOGS },
         properties: {
             'ID': { title: [{ text: { content: `${new Date().toISOString()}-${teamId}` } }] },
-            '# Points': { number: points },
+            'Points': { number: points },
             'Stands': { relation: [{ id: standId }] },
             'Equipes': { relation: [{ id: teamId }] }
         }
@@ -86,7 +86,7 @@ const getScoreLogs = async () => {
 
         return {
             logId: page.id, // Ajout de l'ID du log
-            points: page.properties['# Points'].number,
+            points: page.properties['Points'].number,
             timestamp: page.properties.Timestamp.created_time,
             teamName: teamRelation ? teamMap.get(teamRelation.id) : 'N/A',
             standName: standRelation ? standMap.get(standRelation.id) : 'N/A'
@@ -98,7 +98,7 @@ const getScoreLogs = async () => {
 // NOUVELLE FONCTION
 const updateScore = async (logId, newPoints) => {
     const logPage = await notion.pages.retrieve({ page_id: logId });
-    const oldPoints = logPage.properties['# Points'].number;
+    const oldPoints = logPage.properties['Points'].number;
     const teamId = logPage.properties['Equipes'].relation[0].id;
     
     const pointDifference = newPoints - oldPoints;
@@ -108,7 +108,7 @@ const updateScore = async (logId, newPoints) => {
     
     await notion.pages.update({
         page_id: logId,
-        properties: { '# Points': { number: newPoints } }
+        properties: { 'Points': { number: newPoints } }
     });
 
     await notion.pages.update({
@@ -120,7 +120,7 @@ const updateScore = async (logId, newPoints) => {
 // NOUVELLE FONCTION
 const deleteScore = async (logId) => {
     const logPage = await notion.pages.retrieve({ page_id: logId });
-    const pointsToDelete = logPage.properties['# Points'].number;
+    const pointsToDelete = logPage.properties['Points'].number;
     const teamId = logPage.properties['Equipes'].relation[0].id;
 
     const teamPage = await notion.pages.retrieve({ page_id: teamId });
