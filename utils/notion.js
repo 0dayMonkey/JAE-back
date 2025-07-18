@@ -52,7 +52,7 @@ const addScore = async (teamId, standId, points) => {
         parent: { database_id: DB_LOGS },
         properties: {
             'ID': { title: [{ text: { content: `${new Date().toISOString()}-${teamId}` } }] },
-            '# Points': { number: points },
+            'Points': { number: points },
             'Stands': { relation: [{ id: standId }] },
             'Equipes': { relation: [{ id: teamId }] }
         }
