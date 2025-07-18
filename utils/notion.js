@@ -6,6 +6,8 @@ const DB_EQUIPES = process.env.NOTION_DB_EQUIPES;
 const DB_STANDS = process.env.NOTION_DB_STANDS;
 const DB_LOGS = process.env.NOTION_DB_LOGS;
 
+// --- Fonctions de base (getTeams, getStandsList, findStandByName) ---
+
 const getTeams = async () => {
     const response = await notion.databases.query({
         database_id: DB_EQUIPES,
@@ -35,19 +37,17 @@ const findStandByName = async (name) => {
     if (response.results.length === 0) return null;
     const page = response.results[0];
     const pinProperty = page.properties['PIN Sécurisé'];
-    if (!pinProperty || !pinProperty.rich_text || pinProperty.rich_text.length === 0) {
-        return null; 
-    }
+    if (!pinProperty || !pinProperty.rich_text || pinProperty.rich_text.length === 0) return null;
     const isActive = page.properties['Actif'] ? page.properties['Actif'].checkbox : true;
-    if (!isActive) {
-        return { active: false };
-    }
+    if (!isActive) return { active: false };
     return {
         id: page.id,
         name: page.properties['Nom du Stand'].title[0].text.content,
         pinHash: pinProperty.rich_text[0].text.content
     };
 };
+
+// --- Fonctions de gestion des scores ---
 
 const addScore = async (teamId, standId, points) => {
     await notion.pages.create({
@@ -95,14 +95,8 @@ const updateScore = async (logId, newPoints) => {
     const pointDifference = newPoints - oldPoints;
     const teamPage = await notion.pages.retrieve({ page_id: teamId });
     const currentTeamScore = teamPage.properties['Score Total'].number || 0;
-    await notion.pages.update({
-        page_id: logId,
-        properties: { 'Points': { number: newPoints } }
-    });
-    await notion.pages.update({
-        page_id: teamId,
-        properties: { 'Score Total': { number: currentTeamScore + pointDifference } }
-    });
+    await notion.pages.update({ page_id: logId, properties: { 'Points': { number: newPoints } } });
+    await notion.pages.update({ page_id: teamId, properties: { 'Score Total': { number: currentTeamScore + pointDifference } } });
 };
 
 const deleteScore = async (logId) => {
@@ -113,11 +107,10 @@ const deleteScore = async (logId) => {
     const teamPage = await notion.pages.retrieve({ page_id: teamId });
     const currentTeamScore = teamPage.properties['Score Total'].number || 0;
     await notion.pages.update({ page_id: logId, archived: true });
-    await notion.pages.update({
-        page_id: teamId,
-        properties: { 'Score Total': { number: currentTeamScore - pointsToDelete } }
-    });
+    await notion.pages.update({ page_id: teamId, properties: { 'Score Total': { number: currentTeamScore - pointsToDelete } } });
 };
+
+// --- Fonctions de gestion des Stands ---
 
 const createStand = async (name, pin) => {
     const salt = await bcrypt.genSalt(10);
@@ -132,45 +125,51 @@ const createStand = async (name, pin) => {
     });
 };
 
-
-const setTeamScore = async (teamId, newScore) => {
-    await notion.pages.update({
-        page_id: teamId,
-        properties: { 'Score Total': { number: newScore } }
-    });
-};
-
-const adjustTeamScore = async (teamId, pointsAdjustment) => {
-    const adminStandResponse = await notion.databases.query({
-        database_id: DB_STANDS,
-        filter: { property: 'Nom du Stand', title: { equals: 'Admin' } }
-    });
-    if (adminStandResponse.results.length === 0) {
-        throw new Error("Le stand 'Admin' est introuvable. Créez-le pour logger les ajustements.");
-    }
-    const adminStandId = adminStandResponse.results[0].id;
-
-    await addScore(teamId, adminStandId, pointsAdjustment);
-};
-
-
 const toggleStandActive = async (standId, isActive) => {
-    await notion.pages.update({
-        page_id: standId,
-        properties: { 'Actif': { checkbox: isActive } }
-    });
+    await notion.pages.update({ page_id: standId, properties: { 'Actif': { checkbox: isActive } } });
 };
 
 const resetStandPin = async (standId, newPin) => {
     const salt = await bcrypt.genSalt(10);
     const pinHash = await bcrypt.hash(newPin, salt);
-    await notion.pages.update({
-        page_id: standId,
-        properties: { 'PIN Sécurisé': { rich_text: [{ text: { content: pinHash } }] } }
-    });
+    await notion.pages.update({ page_id: standId, properties: { 'PIN Sécurisé': { rich_text: [{ text: { content: pinHash } }] } } });
 };
+
+
+// --- Fonctions de gestion des Équipes ---
+
+const setTeamScore = async (teamId, newScore) => {
+    await notion.pages.update({ page_id: teamId, properties: { 'Score Total': { number: newScore } } });
+};
+
+// VERSION RENFORCÉE de adjustTeamScore
+const adjustTeamScore = async (teamId, pointsAdjustment) => {
+    console.log(`[adjustTeamScore] Début: Ajustement de ${pointsAdjustment} points pour l'équipe ${teamId}`);
+    try {
+        const adminStandResponse = await notion.databases.query({
+            database_id: DB_STANDS,
+            filter: { property: 'Nom du Stand', title: { equals: 'Admin' } }
+        });
+        if (adminStandResponse.results.length === 0) {
+            throw new Error("Le stand 'Admin' est introuvable sur Notion. Veuillez le créer.");
+        }
+        const adminStandId = adminStandResponse.results[0].id;
+        console.log(`[adjustTeamScore] Stand Admin trouvé: ${adminStandId}`);
+
+        // Appel de la fonction addScore qui contient la logique complète
+        await addScore(teamId, adminStandId, pointsAdjustment);
+        console.log(`[adjustTeamScore] Fin: Score ajouté avec succès.`);
+
+    } catch (error) {
+        console.error("[adjustTeamScore] ERREUR FATALE:", error);
+        // On re-lance l'erreur pour qu'elle soit attrapée par le 'catch' de la route Express
+        throw error;
+    }
+};
+
 
 module.exports = {
     getTeams, getStandsList, findStandByName, addScore, getScoreLogs,
-    updateScore, deleteScore, createStand, toggleStandActive, resetStandPin, setTeamScore, adjustTeamScore
+    updateScore, deleteScore, createStand, toggleStandActive, resetStandPin,
+    setTeamScore, adjustTeamScore
 };
