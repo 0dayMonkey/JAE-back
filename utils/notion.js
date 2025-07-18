@@ -131,6 +131,28 @@ const createStand = async (name, pin) => {
     });
 };
 
+
+const setTeamScore = async (teamId, newScore) => {
+    await notion.pages.update({
+        page_id: teamId,
+        properties: { 'Score Total': { number: newScore } }
+    });
+};
+
+const adjustTeamScore = async (teamId, pointsAdjustment) => {
+    const adminStandResponse = await notion.databases.query({
+        database_id: DB_STANDS,
+        filter: { property: 'Nom du Stand', title: { equals: 'Admin' } }
+    });
+    if (adminStandResponse.results.length === 0) {
+        throw new Error("Le stand 'Admin' est introuvable. Créez-le pour logger les ajustements.");
+    }
+    const adminStandId = adminStandResponse.results[0].id;
+
+    await addScore(teamId, adminStandId, pointsAdjustment);
+};
+
+
 const toggleStandActive = async (standId, isActive) => {
     await notion.pages.update({
         page_id: standId,
@@ -149,5 +171,5 @@ const resetStandPin = async (standId, newPin) => {
 
 module.exports = {
     getTeams, getStandsList, findStandByName, addScore, getScoreLogs,
-    updateScore, deleteScore, createStand, toggleStandActive, resetStandPin
+    updateScore, deleteScore, createStand, toggleStandActive, resetStandPin, setTeamScore, adjustTeamScore
 };

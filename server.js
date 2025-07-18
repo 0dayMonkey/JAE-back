@@ -144,6 +144,27 @@ app.post('/api/admin/stands', authenticateToken, async (req, res) => {
     }
 });
 
+app.put('/api/admin/teams/:teamId/set', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        await notionUtils.setTeamScore(req.params.teamId, req.body.score);
+        res.json({ message: 'Score de l\'équipe mis à jour.' });
+    } catch(error) {
+        res.status(500).json({ message: 'Erreur lors de la définition du score.' });
+    }
+});
+
+app.post('/api/admin/teams/:teamId/adjust', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    try {
+        await notionUtils.adjustTeamScore(req.params.teamId, req.body.points);
+        res.status(201).json({ message: 'Score de l\'équipe ajusté.' });
+    } catch(error) {
+        res.status(500).json({ message: 'Erreur lors de l\'ajustement du score.' });
+    }
+});
+
+
 app.put('/api/admin/stands/:standId/toggle', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
     try {
