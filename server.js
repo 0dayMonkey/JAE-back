@@ -8,29 +8,24 @@ const notionUtils = require('./utils/notion');
 const app = express();
 app.use(express.json());
 
-// Configuration CORS stricte
 const corsOptions = {
   origin: process.env.FRONTEND_URL, 
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
 
-// --- MIDDLEWARE D'AUTHENTIFICATION ---
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (token == null) return res.sendStatus(401); // Unauthorized
+    if (token == null) return res.sendStatus(401);
 
     jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403); // Forbidden
+        if (err) return res.sendStatus(403);
         req.user = user;
         next();
     });
 };
 
-// --- ROUTES PUBLIQUES ---
-
-// [GET] /api/scores - Récupère le classement public
 app.get('/api/scores', async (req, res) => {
     try {
         const teams = await notionUtils.getTeams();
@@ -40,7 +35,6 @@ app.get('/api/scores', async (req, res) => {
     }
 });
 
-// [GET] /api/init-data - Fournit les données pour les formulaires
 app.get('/api/init-data', async (req, res) => {
     try {
         const [teams, stands] = await Promise.all([
@@ -53,28 +47,35 @@ app.get('/api/init-data', async (req, res) => {
     }
 });
 
-
-// --- ROUTES D'AUTHENTIFICATION ---
-
-// [POST] /api/auth/stand - Connexion pour un stand
 app.post('/api/auth/stand', async (req, res) => {
     const { standName, pin } = req.body;
-    if (!standName || !pin) return res.status(400).send('Nom du stand et PIN requis.');
+    if (!standName || !pin) {
+        return res.status(400).send('Nom du stand et PIN requis.');
+    }
     
-    const stand = await notionUtils.findStandByName(standName);
-    if (!stand) return res.status(404).send('Stand non trouvé.');
+    try {
+        const stand = await notionUtils.findStandByName(standName);
+        if (!stand) {
+            return res.status(404).send('Stand non trouvé.');
+        }
 
-    const validPin = await bcrypt.compare(pin, stand.pinHash);
-    if (!validPin) return res.status(403).send('PIN incorrect.');
+        const validPin = await bcrypt.compare(pin, stand.pinHash);
+        if (!validPin) {
+            return res.status(403).send('PIN incorrect.');
+        }
 
-    const accessToken = jwt.sign({ role: 'stand', standId: stand.id, standName: stand.name }, process.env.JWT_SECRET, { expiresIn: '8h' });
-    res.json({ accessToken });
+        const accessToken = jwt.sign({ role: 'stand', standId: stand.id, standName: stand.name }, process.env.JWT_SECRET, { expiresIn: '8h' });
+        res.json({ accessToken });
+
+    } catch (error) {
+        console.error("Erreur lors de l'authentification du stand:", error);
+        res.status(500).send("Erreur serveur lors de la vérification du stand. L'API Notion est peut-être indisponible.");
+    }
 });
 
-// [POST] /api/auth/admin - Connexion pour l'admin
 app.post('/api/auth/admin', async (req, res) => {
     const { password } = req.body;
-    if (password === process.env.ADMIN_PASSWORD) { // Dans une vraie app, hasher ce mot de passe
+    if (password === process.env.ADMIN_PASSWORD) {
         const accessToken = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '8h' });
         res.json({ accessToken });
     } else {
@@ -82,9 +83,6 @@ app.post('/api/auth/admin', async (req, res) => {
     }
 });
 
-// --- ROUTES PROTÉGÉES ---
-
-// [POST] /api/scores - Ajoute un score
 app.post('/api/scores', authenticateToken, async (req, res) => {
     if (req.user.role !== 'stand') return res.sendStatus(403);
     
@@ -100,7 +98,6 @@ app.post('/api/scores', authenticateToken, async (req, res) => {
     }
 });
 
-// [GET] /api/admin/logs - Récupère tous les logs pour l'admin
 app.get('/api/admin/logs', authenticateToken, async (req, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
 
