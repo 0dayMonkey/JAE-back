@@ -53,6 +53,7 @@ const addScore = async (teamId, standId, points) => {
     await notion.pages.create({
         parent: { database_id: DB_LOGS },
         properties: {
+            'ID': { title: [{ text: { content: `Log-${Date.now()}` } }] },
             'Points': { number: points },
             'Stands': { relation: [{ id: standId }] },
             'Equipes': { relation: [{ id: teamId }] }
