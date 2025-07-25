@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const notionUtils = require('./utils/notion');
@@ -8,11 +7,7 @@ const notionUtils = require('./utils/notion');
 const app = express();
 app.use(express.json());
 
-const corsOptions = {
-  origin: process.env.FRONTEND_URL,
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
